@@ -1,0 +1,8 @@
+[package]
+name = "intel8080-emulator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+intel8080-core = { path = "../core" }
+anyhow = "1"
