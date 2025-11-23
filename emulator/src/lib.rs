@@ -20,7 +20,11 @@ impl Emulator {
    pub fn emulate(&mut self) {
         while true {
             self.cpu.print_debug();
-            self.cpu.step();
+            self.cpu.step(); 
+
+            if self.cpu.is_halted() {
+                break;
+            }
         }
    }
 }
