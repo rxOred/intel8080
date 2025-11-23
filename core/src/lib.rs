@@ -1,3 +1,5 @@
+use std::backtrace;
+
 pub struct Flags(u8);
 
 impl Flags {
@@ -165,10 +167,21 @@ impl Cpu8080 {
         self.sp = 0xFFFF; // Initialize stack pointer to top of memory
     }
 
+    pub fn increment_pc(&mut self, count: u8) {
+        // increment pc by the count
+        self.pc += (16 * count) as u16;
+    }
+
+    pub fn is_halted(&self) -> bool {
+        return self.halted
+    }
+
     pub fn step(&mut self) {
-        if self.halted {
+        if self.is_halted() {
             return;
         }
+
+        let mut increment_pc_by: u8 = 1;      
         
         let opcode = self.fetch_byte();
         match opcode {
@@ -215,6 +228,51 @@ impl Cpu8080 {
                 self.update_metadata(5);
             }
 
+            b if (b & 0xC7) == 0x06 => {
+                let dest_code = (b >> 3) & 0b0000_0111;
+                let imm_value = self.fetch_byte();
+                let dest_val = self.get_register_ref_mut_by_code(dest_code);
+                *dest_val = imm_value;
+
+                self.update_metadata(7);
+                increment_pc_by += 1; 
+            }
+
+            // LXI instructions
+            b if (b & 0xCF) == 0x01 => {
+                let rp_code = (b >> 4) & 0b0000_0011;
+                let data = self.fetch_word();
+                match rp_code {
+                    0 => self.set_bc(data),
+                    1 => self.set_de(data),
+                    2 => self.set_hl(data),
+                    3 => self.sp = data,
+                    _ => panic!("Invalid register pair code: {}", rp_code),
+                }
+
+                self.update_metadata(10);
+                increment_pc_by += 2;
+            }
+
+            // INC / DEC instructions
+            b if (b & 0xC7) == 0x04 => {
+                let reg_code = (b >> 3) & 0b0000_0111;
+                let reg_ref = self.get_register_ref_mut_by_code(reg_code);
+                *reg_ref = reg_ref.wrapping_add(1);
+
+                self.update_metadata(5);
+            }
+
+            b if (b & 0xC7) == 0x05 => {
+                let reg_code = (b >> 3) & 0b0000_0111;
+                let reg_ref = self.get_register_ref_mut_by_code(reg_code);
+                *reg_ref = reg_ref.wrapping_sub(1);
+
+                self.update_metadata(5);
+            }
+
+            // 
+
             0x76 => {
                 // HLT
                 self.halted = true;
@@ -225,6 +283,8 @@ impl Cpu8080 {
                 panic!("Unimplemented opcode: {:02X}", opcode);
             }
         }
+
+        self.increment_pc(increment_pc_by);
     } 
 
     // return an immutable reference to the register or memory specified by `code`.
@@ -285,6 +345,11 @@ impl Cpu8080 {
     fn set_de(&mut self, value: u16) {
         self.d = (value >> 8) as u8;
         self.e = (value & 0xFF) as u8;
+    }
+
+    fn set_hl(&mut self, value: u16) {
+        self.h = (value >> 8) as u8;
+        self.l = (value & 0xFF) as u8;
     }
 
     fn get_hl(&self) -> u16 {
