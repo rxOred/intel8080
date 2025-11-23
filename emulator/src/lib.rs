@@ -18,13 +18,16 @@ impl Emulator {
    }
 
    pub fn emulate(&mut self) {
-        while true {
-            self.cpu.print_debug();
+        let mut i = 0;
+        while  i < 10{
+      
             self.cpu.step(); 
-
+            self.cpu.print_debug(); 
             if self.cpu.is_halted() {
                 break;
             }
+
+            i += 1;
         }
    }
 }
