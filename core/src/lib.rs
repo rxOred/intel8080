@@ -155,7 +155,7 @@ impl Cpu8080 {
         println!("Flags: {:08b}", self.flags.0);
         println!("PC: {:04X} SP: {:04X}", self.pc, self.sp);
         println!("Interrupts Enabled: {}", self.interrupts_enabled);
-        println!("Cycles: {} Instructions Executed: {}",
+        println!("Cycles: {} Instructions Executed: {}\n",
                  self.metadata.cycles, self.metadata.instructions_executed);
     }
 
@@ -180,8 +180,6 @@ impl Cpu8080 {
         if self.is_halted() {
             return;
         }
-
-        let mut increment_pc_by: u8 = 1;      
         
         let opcode = self.fetch_byte();
         match opcode {
@@ -228,14 +226,14 @@ impl Cpu8080 {
                 self.update_metadata(5);
             }
 
-            b if (b & 0xC7) == 0x06 => {
+            // mvi
+            b if (b & 0xC7) == 0x06 => { 
                 let dest_code = (b >> 3) & 0b0000_0111;
                 let imm_value = self.fetch_byte();
                 let dest_val = self.get_register_ref_mut_by_code(dest_code);
                 *dest_val = imm_value;
 
                 self.update_metadata(7);
-                increment_pc_by += 1; 
             }
 
             // LXI instructions
@@ -251,7 +249,6 @@ impl Cpu8080 {
                 }
 
                 self.update_metadata(10);
-                increment_pc_by += 2;
             }
 
             // INC / DEC instructions
@@ -283,8 +280,6 @@ impl Cpu8080 {
                 panic!("Unimplemented opcode: {:02X}", opcode);
             }
         }
-
-        self.increment_pc(increment_pc_by);
     } 
 
     // return an immutable reference to the register or memory specified by `code`.
