@@ -256,7 +256,7 @@ impl Cpu8080 {
                 let reg_code = (b >> 3) & 0b0000_0111;
                 let reg_ref = self.get_register_ref_mut_by_code(reg_code);
                 *reg_ref = reg_ref.wrapping_add(1);
-
+                self.update_flags(*reg_ref);
                 self.update_metadata(5);
             }
 
@@ -264,7 +264,7 @@ impl Cpu8080 {
                 let reg_code = (b >> 3) & 0b0000_0111;
                 let reg_ref = self.get_register_ref_mut_by_code(reg_code);
                 *reg_ref = reg_ref.wrapping_sub(1);
-
+                self.update_flags(*reg_ref);
                 self.update_metadata(5);
             }
 
@@ -281,6 +281,25 @@ impl Cpu8080 {
             }
         }
     } 
+
+    fn update_flags(&mut self, result: u8) {
+        // zero Flag
+        self.flags.set_zero(result == 0);
+
+        // sign Flag
+        self.flags.set_sign((result & 0x80) != 0);
+
+        // aux 
+
+        // parity Flag
+        let mut count = 0;
+        for i in 0..8 {
+            if (result >> i) & 1 == 1 {
+                count += 1;
+            }
+        }
+        self.flags.set_parity(count % 2 == 0);
+    }
 
     // return an immutable reference to the register or memory specified by `code`.
     fn get_register_by_code(&self, code: u8) -> u8 {
