@@ -1,5 +1,3 @@
-use std::backtrace;
-
 pub struct Flags(u8);
 
 impl Flags {
@@ -150,13 +148,17 @@ impl Cpu8080 {
 
     pub fn print_debug(&self) {
         println!("<-----------------------cpu state----------------------->");
-        println!("A: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X}",
-                 self.a, self.b, self.c, self.d, self.e, self.h, self.l);
+        println!(
+            "A: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X}",
+            self.a, self.b, self.c, self.d, self.e, self.h, self.l
+        );
         println!("Flags: {:08b}", self.flags.0);
         println!("PC: {:04X} SP: {:04X}", self.pc, self.sp);
         println!("Interrupts Enabled: {}", self.interrupts_enabled);
-        println!("Cycles: {} Instructions Executed: {}\n",
-                 self.metadata.cycles, self.metadata.instructions_executed);
+        println!(
+            "Cycles: {} Instructions Executed: {}\n",
+            self.metadata.cycles, self.metadata.instructions_executed
+        );
     }
 
     pub fn load_program(&mut self, program: &[u8], start_address: u16) {
@@ -173,21 +175,21 @@ impl Cpu8080 {
     }
 
     pub fn is_halted(&self) -> bool {
-        return self.halted
+        self.halted
     }
 
     pub fn step(&mut self) {
         if self.is_halted() {
             return;
         }
-        
+
         let opcode = self.fetch_byte();
         match opcode {
             0x00 => {
                 // NOP
                 self.update_metadata(4);
             }
-            
+
             // Load Immediate Instructions for Register Pairs
             0x01 => {
                 // LXI B, D16
@@ -218,7 +220,7 @@ impl Cpu8080 {
             // immediate loads (MOV r_dest, r_src)
             b if (b & 0b1100_0000) == 0b0100_0000 => {
                 let dest_code = (b >> 3) & 0b0000_0111;
-                let src_code = b & 0b0000_0111; 
+                let src_code = b & 0b0000_0111;
                 let src_val = self.get_register_by_code(src_code);
                 let dest_val = self.get_register_ref_mut_by_code(dest_code);
                 *dest_val = src_val;
@@ -227,7 +229,7 @@ impl Cpu8080 {
             }
 
             // mvi
-            b if (b & 0xC7) == 0x06 => { 
+            b if (b & 0xC7) == 0x06 => {
                 let dest_code = (b >> 3) & 0b0000_0111;
                 let imm_value = self.fetch_byte();
                 let dest_val = self.get_register_ref_mut_by_code(dest_code);
@@ -254,42 +256,52 @@ impl Cpu8080 {
             // INC / DEC instructions
             b if (b & 0xC7) == 0x04 => {
                 let reg_code = (b >> 3) & 0b0000_0111;
-                let reg_ref = self.get_register_ref_mut_by_code(reg_code);
+                let reg_ref = self.get_register_ref_mut_by_code(reg_code); 
+                let old_val = *reg_ref;
                 *reg_ref = reg_ref.wrapping_add(1);
-                self.update_flags(*reg_ref);
+                let result = *reg_ref;
+                self.update_flags(old_val, result, false);
                 self.update_metadata(5);
             }
 
             b if (b & 0xC7) == 0x05 => {
                 let reg_code = (b >> 3) & 0b0000_0111;
                 let reg_ref = self.get_register_ref_mut_by_code(reg_code);
+                let old_val = *reg_ref;
                 *reg_ref = reg_ref.wrapping_sub(1);
-                self.update_flags(*reg_ref);
+                let result = *reg_ref;
+                self.update_flags(old_val, result, false);
                 self.update_metadata(5);
             }
 
-            // 
-
+            //
             0x76 => {
                 // HLT
                 self.halted = true;
                 self.update_metadata(7);
             }
-            
+
             _ => {
                 panic!("Unimplemented opcode: {:02X}", opcode);
             }
         }
-    } 
+    }
 
-    fn update_flags(&mut self, result: u8) {
+    fn update_flags(&mut self, old_val: u8, result: u8, is_add: bool) {
         // zero Flag
         self.flags.set_zero(result == 0);
 
         // sign Flag
         self.flags.set_sign((result & 0x80) != 0);
 
-        // aux 
+        // aux
+        if is_add {
+            let aux_carry = ((old_val & 0x0F) + (result & 0x0F)) > 0x0F;
+            self.flags.set_aux(aux_carry);
+        } else {
+            let aux_borrow = (old_val & 0x0F) < (result & 0x0F);
+            self.flags.set_aux(aux_borrow);
+        }
 
         // parity Flag
         let mut count = 0;
@@ -316,7 +328,7 @@ impl Cpu8080 {
         }
     }
 
-    /// return a mutable reference to the register or memory specified by `code`. 
+    /// return a mutable reference to the register or memory specified by `code`.
     fn get_register_ref_mut_by_code(&mut self, code: u8) -> &mut u8 {
         match code {
             0 => &mut self.b,
@@ -330,7 +342,7 @@ impl Cpu8080 {
             _ => panic!("Invalid register code: {}", code),
         }
     }
- 
+
     fn fetch_word(&mut self) -> u16 {
         let low = self.fetch_byte() as u16;
         let high = self.fetch_byte() as u16;
@@ -384,5 +396,5 @@ impl Cpu8080 {
         let addr = self.get_hl();
         self.bus[addr as usize] = value;
     }
-    
 }
+
