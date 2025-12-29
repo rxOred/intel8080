@@ -15,10 +15,6 @@ impl Flags {
         }
     }
 
-    fn clear_carry(&mut self) {
-        self.0 &= !Self::CARRY;
-    }
-
     fn get_carry(&self) -> bool {
         (self.0 & Self::CARRY) != 0
     }
@@ -29,10 +25,6 @@ impl Flags {
         } else {
             self.0 &= !Self::ZERO;
         }
-    }
-
-    fn clear_zero(&mut self) {
-        self.0 &= !Self::ZERO;
     }
 
     fn get_zero(&self) -> bool {
@@ -47,10 +39,6 @@ impl Flags {
         }
     }
 
-    fn clear_parity(&mut self) {
-        self.0 &= !Self::PARITY;
-    }
-
     fn get_parity(&self) -> bool {
         (self.0 & Self::PARITY) != 0
     }
@@ -63,10 +51,6 @@ impl Flags {
         }
     }
 
-    fn clear_aux(&mut self) {
-        self.0 &= !Self::AUX;
-    }
-
     fn get_aux(&self) -> bool {
         (self.0 & Self::AUX) != 0
     }
@@ -77,10 +61,6 @@ impl Flags {
         } else {
             self.0 &= !Self::SIGN;
         }
-    }
-
-    fn clear_sign(&mut self) {
-        self.0 &= !Self::SIGN;
     }
 
     fn get_sign(&self) -> bool {
@@ -256,7 +236,7 @@ impl Cpu8080 {
             // INC / DEC instructions
             b if (b & 0xC7) == 0x04 => {
                 let reg_code = (b >> 3) & 0b0000_0111;
-                let reg_ref = self.get_register_ref_mut_by_code(reg_code); 
+                let reg_ref = self.get_register_ref_mut_by_code(reg_code);
                 let old_val = *reg_ref;
                 *reg_ref = reg_ref.wrapping_add(1);
                 let result = *reg_ref;
@@ -274,7 +254,21 @@ impl Cpu8080 {
                 self.update_metadata(5);
             }
 
-            //
+            // ADD instruction
+            b if (b & 0xf8) == 0x80 => {
+                let src_code = b & 0b0000_0111;
+                let std_val = self.get_register_by_code(src_code);
+                let old_a = self.a;
+                let (result, carry) = self.a.overflowing_add(std_val);
+                self.a = result;
+                self.update_flags(old_a, result, true);
+                // need to check this instruction
+                self.flags.set_carry(carry);
+                self.update_metadata(4);
+            }
+
+            // ADI
+            0xc6 => {}
             0x76 => {
                 // HLT
                 self.halted = true;
@@ -397,4 +391,3 @@ impl Cpu8080 {
         self.bus[addr as usize] = value;
     }
 }
-
